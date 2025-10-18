@@ -25,10 +25,14 @@ class Database {
       final file = File('$_dataPath/users.json');
       if (await file.exists()) {
         final content = await file.readAsString();
-        final List<dynamic> data = jsonDecode(content);
-        for (var json in data) {
-          final user = User.fromJson(json);
-          _users[user.id] = user;
+        // CORRECTED: This now gracefully handles empty or invalid files.
+        if (content.trim().isEmpty) return;
+        final dynamic data = jsonDecode(content);
+        if (data is List) {
+          for (var json in data) {
+            final user = User.fromJson(json);
+            _users[user.id] = user;
+          }
         }
       }
     } catch (e) {
@@ -41,10 +45,14 @@ class Database {
       final file = File('$_dataPath/orders.json');
       if (await file.exists()) {
         final content = await file.readAsString();
-        final List<dynamic> data = jsonDecode(content);
-        for (var json in data) {
-          final order = Order.fromJson(json);
-          _orders[order.id] = order;
+        // CORRECTED: This now gracefully handles empty or invalid files.
+        if (content.trim().isEmpty) return;
+        final dynamic data = jsonDecode(content);
+        if (data is List) {
+          for (var json in data) {
+            final order = Order.fromJson(json);
+            _orders[order.id] = order;
+          }
         }
       }
     } catch (e) {
@@ -79,14 +87,7 @@ class Database {
   }
 
   User? getUserByUsername(String username) {
-    return _users.values.firstWhere(
-      (user) => user.username == username,
-      orElse: () => throw Exception('User not found'),
-    );
-  }
-
-  User? getUserById(String id) {
-    return _users[id];
+    return _users.values.firstWhere((user) => user.username == username, orElse: () => throw Exception('User not found'));
   }
 
   Future<Order> createOrder(Order order) async {
@@ -101,35 +102,15 @@ class Database {
     return order;
   }
 
-  Order? getOrderById(String id) {
-    return _orders[id];
-  }
-
   Order? getOrderByRfidUid(String rfidUid) {
     try {
-      return _orders.values.firstWhere(
-        (order) => order.rfidUid == rfidUid,
-        orElse: () => throw Exception('Order not found'),
-      );
+      return _orders.values.firstWhere((order) => order.rfidUid == rfidUid);
     } catch (e) {
       return null;
     }
   }
 
   List<Order> getAllOrders() {
-    return _orders.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  }
-
-  List<Order> getOrdersByDepartment(String department) {
-    return _orders.values
-        .where((order) => order.department == department)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  }
-
-  List<Order> getOrdersByStatus(String status) {
-    return _orders.values.where((order) => order.status == status).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return _orders.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 }

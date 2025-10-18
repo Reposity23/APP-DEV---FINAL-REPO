@@ -21,24 +21,20 @@ void main() async {
   await _db.initialize();
   print('Database initialized');
 
-  // --- Main Router ---
-  final router = Router();
-
-  // --- API Routes ---
-  router.post('/api/login', _loginHandler);
-  router.post('/api/signup', _signupHandler);
-  router.post('/api/orders', _createOrderHandler);
-  router.post('/api/updateStatus', _updateStatusHandler);
+  final apiRouter = Router();
+  apiRouter.post('/api/login', _loginHandler);
+  apiRouter.post('/api/signup', _signupHandler);
+  apiRouter.post('/api/orders', _createOrderHandler);
+  apiRouter.post('/api/updateStatus', _updateStatusHandler);
   
-  // CORRECTED: This route has no authentication.
-  router.get('/api/orders', (Request request) {
+  apiRouter.get('/api/orders', (Request request) {
     final orders = _db.getAllOrders();
     return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
         headers: {'Content-Type': 'application/json'});
   });
 
-  // --- WebSocket Route ---
-  router.get('/ws', webSocketHandler((WebSocketChannel webSocket) {
+  // CORRECTED: The function signature for the WebSocket handler now includes the optional protocol parameter.
+  apiRouter.get('/ws', webSocketHandler((WebSocketChannel webSocket, String? protocol) {
     _clients.add(webSocket);
     print('WebSocket client connected. Total clients: ${_clients.length}');
     webSocket.stream.listen((message) {},
@@ -48,30 +44,20 @@ void main() async {
     });
   }));
 
-  // --- Static File Handler ---
-  // CORRECTED: Serves the entire dashboard directory, including the 'sounds' subfolder.
-  final staticHandler = createStaticHandler(
-    p.join(Directory.current.path, '..', 'dashboard'),
-    defaultDocument: 'index.html',
+  final dashboardPath = p.normalize(p.join(Directory.current.path, '..', 'dashboard'));
+  final staticHandler = createStaticHandler(dashboardPath, defaultDocument: 'index.html');
+
+  final cascade = Cascade().add(staticHandler).add(apiRouter.call);
+
+  final server = await shelf_io.serve(
+    const Pipeline().addMiddleware(logRequests()).addHandler(cascade.handler),
+    '0.0.0.0',
+    8080,
   );
-
-  // --- Final Handler ---
-  // ALL requests not matched by the router will fall through to the static handler.
-  final handler = const Pipeline()
-      .addMiddleware(logRequests())
-      .addHandler(router.call);
-
-  final finalHandler = Cascade().add(handler).add(staticHandler).handler;
-
-  final server = await shelf_io.serve(finalHandler, '0.0.0.0', 8080);
 
   print('Server running on http://${server.address.host}:${server.port}');
   print('Dashboard available at http://${server.address.host}:${server.port}');
 }
-
-
-// --- Handlers (Login, Signup, etc.) ---
-// Note: These are simplified and should have proper error handling in a real app
 
 Future<Response> _loginHandler(Request request) async {
   final payload = await request.readAsString();
@@ -92,7 +78,7 @@ Future<Response> _signupHandler(Request request) async {
     username: data['username'],
     email: data['email'],
     passwordHash: AuthService.hashPassword(data['password']),
-    department: data['department'],
+    department: "General", // Default department for customers
     createdAt: DateTime.now(),
   );
   await _db.createUser(user);
@@ -145,7 +131,7 @@ void _broadcastToClients(Map<String, dynamic> data) {
     try {
       client.sink.add(message);
     } catch (e) {
-      // Ignore errors from disconnected clients
+      // Ignore errors for disconnected clients
     }
   }
 }
