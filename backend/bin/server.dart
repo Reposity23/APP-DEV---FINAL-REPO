@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_static/shelf_static.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../lib/database.dart';
 import '../lib/models.dart';
@@ -19,179 +21,104 @@ void main() async {
   await _db.initialize();
   print('Database initialized');
 
-  final router = Router();
-
-  router.post('/login', _loginHandler);
-  router.post('/signup', _signupHandler);
-  router.get('/orders', _getOrdersHandler);
-  router.post('/orders', _createOrderHandler);
-  router.post('/updateStatus', _updateStatusHandler);
-
-  // Updated callback with second parameter 'protocol'
-  final wsHandler = webSocketHandler((WebSocketChannel webSocket, String? protocol) {
-    _clients.add(webSocket);
-    print('WebSocket client connected. Total clients: ${_clients.length}');
-
-    webSocket.stream.listen(
-      (message) {
-        print('Received message: $message');
-      },
-      onDone: () {
-        _clients.remove(webSocket);
-        print('WebSocket client disconnected. Total clients: ${_clients.length}');
-      },
-      onError: (error) {
-        print('WebSocket error: $error');
-        _clients.remove(webSocket);
-      },
-    );
+  // --- API Router for backend logic ---
+  final apiRouter = Router();
+  apiRouter.post('/login', _loginHandler);
+  apiRouter.post('/signup', _signupHandler);
+  apiRouter.post('/orders', _createOrderHandler);
+  apiRouter.post('/updateStatus', _updateStatusHandler);
+  
+  // FIX: Removed authentication from the GET /orders route
+  apiRouter.get('/orders', (Request request) {
+    final orders = _db.getAllOrders();
+    return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
+        headers: {'Content-Type': 'application/json'});
   });
 
-  router.get('/ws', wsHandler);
+  apiRouter.get('/ws', webSocketHandler((WebSocketChannel webSocket, String? protocol) {
+    _clients.add(webSocket);
+    print('WebSocket client connected. Total clients: ${_clients.length}');
+    webSocket.stream.listen((message) {
+      // This is a simple echo server for now
+      // In a real app, you would handle messages from the client here
+    }, onDone: () {
+      _clients.remove(webSocket);
+      print('WebSocket client disconnected. Total clients: ${_clients.length}');
+    });
+  }));
 
-  final handler = Pipeline()
-      .addMiddleware(_corsMiddleware())
+  // --- Static File Handler for the Dashboard ---
+  // FIX: Correctly configure the path to the 'dashboard' directory.
+  final dashboardPath = p.normalize(p.join(Directory.current.path, '..', 'dashboard'));
+  final staticHandler = createStaticHandler(dashboardPath, defaultDocument: 'index.html');
+
+  // --- Main Handler combining API and static files ---
+  final cascade = Cascade().add(staticHandler).add(apiRouter);
+
+  final handler = const Pipeline()
+      .addMiddleware(_corsMiddleware)
       .addMiddleware(logRequests())
-      .addHandler(router);
+      .addHandler(cascade.handler);
 
-  final server = await shelf_io.serve(
-    handler,
-    '0.0.0.0',
-    8080,
-  );
+  final server = await shelf_io.serve(handler, '0.0.0.0', 8080);
 
   print('Server running on http://${server.address.host}:${server.port}');
-  print('WebSocket endpoint: ws://${server.address.host}:${server.port}/ws');
+  print('Dashboard available at http://${server.address.host}:${server.port}');
 }
 
-Middleware _corsMiddleware() {
-  return (Handler handler) {
-    return (Request request) async {
-      if (request.method == 'OPTIONS') {
-        return Response.ok('', headers: _corsHeaders);
-      }
+// --- Middleware & Handlers ---
 
-      final response = await handler(request);
-      return response.change(headers: _corsHeaders);
-    };
-  };
-}
+final _corsMiddleware = createMiddleware(requestHandler: (Request request) {
+  if (request.method == 'OPTIONS') {
+    return Response.ok('', headers: _corsHeaders);
+  }
+  return null;
+}, responseHandler: (Response response) {
+  return response.change(headers: _corsHeaders);
+});
 
-final _corsHeaders = {
+const _corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-control-allow-headers': 'origin, content-type, accept, authorization',
 };
 
 Future<Response> _loginHandler(Request request) async {
-  try {
-    final payload = await request.readAsString();
-    final data = jsonDecode(payload);
-    final username = data['username'];
-    final password = data['password'];
-
-    final user = _db.getUserByUsername(username);
-
-    if (user == null || !AuthService.verifyPassword(password, user.passwordHash)) {
-      return Response(401, body: jsonEncode({'error': 'Invalid credentials'}));
-    }
-
-    final token = AuthService.generateToken(user.id, user.username, user.department);
-
-    return Response.ok(
-      jsonEncode({
-        'user': user.toJson(),
-        'token': token,
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('Login error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Login failed'}),
-    );
+  final payload = await request.readAsString();
+  final data = jsonDecode(payload);
+  final user = _db.getUserByUsername(data['username']);
+  if (user == null || !AuthService.verifyPassword(data['password'], user.passwordHash)) {
+    return Response.unauthorized(jsonEncode({'error': 'Invalid credentials'}));
   }
+  final token = AuthService.generateToken(user.id, user.username, user.department);
+  return Response.ok(jsonEncode({'user': user.toJson(), 'token': token}), headers: {'Content-Type': 'application/json'});
 }
 
 Future<Response> _signupHandler(Request request) async {
-  try {
-    final payload = await request.readAsString();
-    final data = jsonDecode(payload);
-
-    final user = User(
-      id: _uuid.v4(),
-      username: data['username'],
-      email: data['email'],
-      passwordHash: AuthService.hashPassword(data['password']),
-      department: data['department'],
-      createdAt: DateTime.now(),
-    );
-
-    await _db.createUser(user);
-
-    final token = AuthService.generateToken(user.id, user.username, user.department);
-
-    return Response(
-      201,
-      body: jsonEncode({
-        'user': user.toJson(),
-        'token': token,
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('Signup error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Signup failed'}),
-    );
-  }
-}
-
-Future<Response> _getOrdersHandler(Request request) async {
-  try {
-    final authHeader = request.headers['authorization'];
-    if (authHeader == null) {
-      return Response(401, body: jsonEncode({'error': 'Unauthorized'}));
-    }
-
-    final token = authHeader.replaceFirst('Bearer ', '');
-    final payload = AuthService.verifyToken(token);
-
-    if (payload == null) {
-      return Response(401, body: jsonEncode({'error': 'Invalid token'}));
-    }
-
-    final orders = _db.getAllOrders();
-
-    return Response.ok(
-      jsonEncode(orders.map((o) => o.toJson()).toList()),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('Get orders error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Failed to fetch orders'}),
-    );
-  }
+  final payload = await request.readAsString();
+  final data = jsonDecode(payload);
+  final user = User(
+    id: _uuid.v4(),
+    username: data['username'],
+    email: data['email'],
+    passwordHash: AuthService.hashPassword(data['password']),
+    department: data['department'],
+    createdAt: DateTime.now(),
+  );
+  await _db.createUser(user);
+  final token = AuthService.generateToken(user.id, user.username, user.department);
+  return Response(201, body: jsonEncode({'user': user.toJson(), 'token': token}), headers: {'Content-Type': 'application/json'});
 }
 
 Future<Response> _createOrderHandler(Request request) async {
-  try {
     final authHeader = request.headers['authorization'];
-    if (authHeader == null) {
-      return Response(401, body: jsonEncode({'error': 'Unauthorized'}));
-    }
-
+    if (authHeader == null) return Response.unauthorized(jsonEncode({'error': 'Unauthorized'}));
     final token = authHeader.replaceFirst('Bearer ', '');
     final payload = AuthService.verifyToken(token);
-
-    if (payload == null) {
-      return Response(401, body: jsonEncode({'error': 'Invalid token'}));
-    }
+    if (payload == null) return Response.unauthorized(jsonEncode({'error': 'Invalid token'}));
 
     final body = await request.readAsString();
     final data = jsonDecode(body);
-
     final order = Order(
       id: _uuid.v4(),
       toyId: data['toy_id'],
@@ -202,80 +129,29 @@ Future<Response> _createOrderHandler(Request request) async {
       status: 'PENDING',
       createdAt: DateTime.now(),
       department: data['department'],
-      totalAmount: data['total_amount'].toDouble(),
+      totalAmount: (data['total_amount'] ?? 0).toDouble(),
     );
-
     await _db.createOrder(order);
-
     _broadcastToClients(order.toJson());
-
-    return Response(
-      201,
-      body: jsonEncode(order.toJson()),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('Create order error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Failed to create order'}),
-    );
-  }
+    return Response(201, body: jsonEncode(order.toJson()), headers: {'Content-Type': 'application/json'});
 }
 
 Future<Response> _updateStatusHandler(Request request) async {
-  try {
-    final payload = await request.readAsString();
-    final data = jsonDecode(payload);
-
-    final rfidUid = data['rfid_uid'];
-    final category = data['category'];
-    final status = data['status'];
-
-    print('Update request - RFID: $rfidUid, Category: $category, Status: $status');
-
-    final order = _db.getOrderByRfidUid(rfidUid);
-
-    if (order == null) {
-      return Response(404, body: jsonEncode({'error': 'Order not found'}));
-    }
-
-    if (order.category != category) {
-      return Response(400, body: jsonEncode({'error': 'Category mismatch'}));
-    }
-
-    final updatedOrder = order.copyWith(
-      status: status,
-      updatedAt: DateTime.now(),
-    );
-
-    await _db.updateOrder(updatedOrder);
-
-    _broadcastToClients(updatedOrder.toJson());
-
-    return Response.ok(
-      jsonEncode({
-        'success': true,
-        'order': updatedOrder.toJson(),
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('Update status error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Failed to update status'}),
-    );
-  }
+  final payload = await request.readAsString();
+  final data = jsonDecode(payload);
+  final rfidUid = data['rfid_uid'];
+  final order = _db.getOrderByRfidUid(rfidUid);
+  if (order == null) return Response.notFound(jsonEncode({'error': 'Order not found'}));
+  
+  final updatedOrder = order.copyWith(status: data['status'], updatedAt: DateTime.now());
+  await _db.updateOrder(updatedOrder);
+  _broadcastToClients(updatedOrder.toJson());
+  return Response.ok(jsonEncode(updatedOrder.toJson()), headers: {'Content-Type': 'application/json'});
 }
 
 void _broadcastToClients(Map<String, dynamic> data) {
   final message = jsonEncode(data);
-  for (var client in List.from(_clients)) {
-    try {
-      client.sink.add(message);
-    } catch (e) {
-      print('Error broadcasting to client: $e');
-      _clients.remove(client);
-    }
+  for (final client in _clients) {
+    client.sink.add(message);
   }
-  print('Broadcasted to ${_clients.length} clients');
 }
