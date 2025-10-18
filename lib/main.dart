@@ -5,12 +5,11 @@ import 'models/order.dart';
 import 'models/user.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart'; // Updated import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive and register adapters
   await Hive.initFlutter();
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(OrderAdapter());
@@ -29,33 +28,30 @@ class MyApp extends StatelessWidget {
         title: 'Smart Toy Store',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          primarySwatch: Colors.blue,
-          useMaterial3: true,
+          // New Professional Color Scheme
+          primarySwatch: Colors.deepPurple,
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
+            seedColor: Colors.deepPurple,
             brightness: Brightness.light,
+            secondary: Colors.amber,
           ),
+          useMaterial3: true,
           appBarTheme: const AppBarTheme(
             centerTitle: true,
             elevation: 2,
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
           ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              elevation: 2,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            selectedItemColor: Colors.deepPurple,
+            unselectedItemColor: Colors.grey,
           ),
         ),
         home: Consumer<AppProvider>(
           builder: (context, provider, _) {
             if (provider.currentUser != null) {
-              return const HomeScreen();
+              // If logged in, go to the new MainScreen
+              return const MainScreen();
             }
             return const LoginScreen();
           },
