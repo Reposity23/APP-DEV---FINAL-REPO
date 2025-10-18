@@ -16,68 +16,51 @@ class Database {
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
-    await _loadUsers();
-    await _loadOrders();
+    await _loadData<User>(_users, 'users.json', User.fromJson);
+    await _loadData<Order>(_orders, 'orders.json', Order.fromJson);
   }
 
-  Future<void> _loadUsers() async {
+  // CORRECTED: A robust, generic function to load data safely.
+  Future<void> _loadData<T>(
+    Map<String, dynamic> map,
+    String fileName,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
     try {
-      final file = File('$_dataPath/users.json');
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        // CORRECTED: This now gracefully handles empty or invalid files.
-        if (content.trim().isEmpty) return;
-        final dynamic data = jsonDecode(content);
-        if (data is List) {
-          for (var json in data) {
-            final user = User.fromJson(json);
-            _users[user.id] = user;
-          }
+      final file = File('$_dataPath/$fileName');
+      if (!await file.exists()) return;
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) return;
+
+      final dynamic data = jsonDecode(content);
+      if (data is List) {
+        for (var jsonObj in data) {
+          final item = fromJson(jsonObj);
+          if (item is User) map[item.id] = item;
+          if (item is Order) map[item.id] = item;
         }
       }
     } catch (e) {
-      print('Error loading users: $e');
-    }
-  }
-
-  Future<void> _loadOrders() async {
-    try {
-      final file = File('$_dataPath/orders.json');
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        // CORRECTED: This now gracefully handles empty or invalid files.
-        if (content.trim().isEmpty) return;
-        final dynamic data = jsonDecode(content);
-        if (data is List) {
-          for (var json in data) {
-            final order = Order.fromJson(json);
-            _orders[order.id] = order;
-          }
-        }
-      }
-    } catch (e) {
-      print('Error loading orders: $e');
+      print('Error loading $fileName: $e');
     }
   }
 
   Future<void> _saveUsers() async {
-    try {
-      final file = File('$_dataPath/users.json');
-      final data = _users.values.map((u) => u.toJson()).toList();
-      await file.writeAsString(jsonEncode(data));
-    } catch (e) {
-      print('Error saving users: $e');
-    }
+    final file = File('$_dataPath/users.json');
+    final data = _users.values.map((u) => u.toJson()).toList();
+    await file.writeAsString(jsonEncode(data));
   }
 
   Future<void> _saveOrders() async {
-    try {
-      final file = File('$_dataPath/orders.json');
-      final data = _orders.values.map((o) => o.toJson()).toList();
-      await file.writeAsString(jsonEncode(data));
-    } catch (e) {
-      print('Error saving orders: $e');
-    }
+    final file = File('$_dataPath/orders.json');
+    final data = _orders.values.map((o) => o.toJson()).toList();
+    await file.writeAsString(jsonEncode(data));
+  }
+
+  Future<void> clearAllOrders() async {
+    _orders.clear();
+    await _saveOrders();
   }
 
   Future<User> createUser(User user) async {
@@ -87,7 +70,11 @@ class Database {
   }
 
   User? getUserByUsername(String username) {
-    return _users.values.firstWhere((user) => user.username == username, orElse: () => throw Exception('User not found'));
+    try {
+      return _users.values.firstWhere((user) => user.username == username) as User?;
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<Order> createOrder(Order order) async {
@@ -104,13 +91,13 @@ class Database {
 
   Order? getOrderByRfidUid(String rfidUid) {
     try {
-      return _orders.values.firstWhere((order) => order.rfidUid == rfidUid);
+      return _orders.values.firstWhere((order) => order.rfidUid == rfidUid) as Order?;
     } catch (e) {
       return null;
     }
   }
 
   List<Order> getAllOrders() {
-    return _orders.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List<Order>.from(_orders.values)..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 }

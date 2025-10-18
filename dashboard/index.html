@@ -16,6 +16,7 @@
         .container { max-width: 1400px; margin: 0 auto; }
         .header { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 28px; color: #333; display: flex; align-items: center; gap: 12px; }
+        .header-controls { display: flex; gap: 10px; }
         .connection-status { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; }
         .connection-status.connected { background: #10b981; color: white; }
         .connection-status.disconnected { background: #ef4444; color: white; }
@@ -40,10 +41,11 @@
         .status-delivered { background: #d1fae5; color: #065f46; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        #clear-history-btn { padding: 8px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ef4444; border-radius: 8px; background-color: #fee2e2; color: #991b1b; font-weight: bold; transition: all 0.3s; }
+        #clear-history-btn:hover { background-color: #ef4444; color: white; }
     </style>
 </head>
 <body>
-    <!-- CORRECTED: Use robust relative paths for all sounds -->
     <audio id="audio-toy-guns" src="/sounds/ebona.mp3" preload="auto"></audio>
     <audio id="audio-action-figures" src="/sounds/cruz.mp3" preload="auto"></audio>
     <audio id="audio-dolls" src="/sounds/marl.mp3" preload="auto"></audio>
@@ -52,13 +54,13 @@
     <div id="app-container" class="container">
         <div class="header">
             <h1><span style="font-size: 36px;">🧸</span> Smart Toy Store Dashboard</h1>
-            <div id="connectionStatus" class="connection-status disconnected">
-                <div class="status-indicator"></div>
-                <span>Disconnected</span>
+            <div class="header-controls">
+                <div id="connectionStatus" class="connection-status disconnected"><div class="status-indicator"></div><span>Disconnected</span></div>
+                <button id="clear-history-btn">Clear History</button>
             </div>
         </div>
         <div class="stats">            <div class="stat-card"><h3>Total Orders</h3><div class="value" id="totalOrders">0</div></div><div class="stat-card"><h3>Pending</h3><div class="value" id="pendingOrders" style="color: #f59e0b;">0</div></div><div class="stat-card"><h3>In Progress</h3><div class="value" id="processingOrders" style="color: #3b82f6;">0</div></div><div class="stat-card"><h3>Delivered</h3><div class="value" id="deliveredOrders" style="color: #10b981;">0</div></div><div class="stat-card"><h3>Total Revenue</h3><div class="value" id="totalRevenue" style="color: #8b5cf6;">$0</div></div></div>
-        <div class="content"><h2>Live Orders</h2><table id="ordersTable"><thead><tr><th>Category</th><th>Toy Name</th><th>RFID UID</th><th>Assigned Person</th><th>Department</th><th>Status</th><th>Amount</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
+        <div class="content"><h2>Live Orders</h2><table id="ordersTable"><thead><tr><th>Category</th><th>Toy Name</th><th>RFID UID</th><th>Assigned Person</th><th>Status</th><th>Amount</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
     </div>
 
     <div id="audio-modal">
@@ -66,7 +68,6 @@
     </div>
 
     <script>
-        // CORRECTED: Use relative URLs for all API and WebSocket connections.
         const API_BASE_URL = '/api';
         const WS_URL = `ws://${window.location.host}/ws`;
 
@@ -92,12 +93,27 @@
                         console.log('Audio context unlocked successfully.');
                     } catch (error) {
                         console.error('Audio unlock failed:', error);
-                        audioUnlocked = true; // Fallback
+                        audioUnlocked = true;
                     }
                 }
                 
                 initializeDashboard();
             }, { once: true });
+
+            document.getElementById('clear-history-btn').addEventListener('click', async () => {
+                if (confirm('Are you sure you want to delete all orders? This action cannot be undone.')) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/orders/clear`, { method: 'POST' });
+                        if (!response.ok) throw new Error('Failed to clear orders');
+                        orders = [];
+                        saveOrdersToCache();
+                        renderDashboard();
+                        console.log('Order history cleared.');
+                    } catch (error) {
+                        console.error('Error clearing order history:', error);
+                    }
+                }
+            });
         });
 
         function initializeDashboard() {
@@ -127,11 +143,19 @@
             socket.onmessage = (event) => {
                 if (!event.data) return;
                 try {
-                    const order = JSON.parse(event.data);
-                    const isNewOrder = !orders.some(o => o.id === order.id);
-                    updateOrAddOrder(order);
+                    const message = JSON.parse(event.data);
+                    // Handle clear event from server
+                    if (message.type === 'clear') {
+                        orders = [];
+                        saveOrdersToCache();
+                        renderDashboard();
+                        return;
+                    }
+                    
+                    const isNewOrder = !orders.some(o => o.id === message.id);
+                    updateOrAddOrder(message);
                     if (isNewOrder) {
-                        playSoundForOrder(order);
+                        playSoundForOrder(message);
                     }
                     saveOrdersToCache();
                     renderDashboard();
@@ -155,7 +179,7 @@
         function renderOrders() {
             const tbody = document.getElementById('ordersBody');
             if (orders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><p>No orders yet.</p></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><p>No orders yet.</p></td></tr>`;
                 return;
             }
             tbody.innerHTML = orders.map(o => `
@@ -164,7 +188,6 @@
                     <td>${o.toy_name}</td>
                     <td>${o.rfid_uid}</td>
                     <td>${o.assigned_person}</td>
-                    <td>${o.department}</td>
                     <td><span class="status-badge status-${o.status.toLowerCase().replace(/_/g, '-')}">${o.status}</span></td>
                     <td>$${o.total_amount.toFixed(2)}</td>
                 </tr>`).join('');

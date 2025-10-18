@@ -5,7 +5,19 @@ JOHN MARWIN EBONA<br>
 PRINCE MARL LIZANDRELLE MIRASOL<br>
 RENZ CHRISTIANE MING
 
+note to self:
+git add .
+git commit -m "fix cors and server connection"
+git branch -M main
+git remote remove origin
+git remote add origin https://github.com/Reposity23/APP-DEV---FINAL-REPO.git
+git push -u origin main
 
+
+    netstat -ano | findstr :8080
+    
+    taskkill /PID 26680 /F
+    - kill task
 A complete real-time LAN-connected ecosystem for toy store operations featuring Flutter mobile app, Dart backend server, Arduino IoT integration, and HTML dashboard.
 
 ## System Architecture

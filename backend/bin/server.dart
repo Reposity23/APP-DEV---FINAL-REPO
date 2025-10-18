@@ -26,14 +26,10 @@ void main() async {
   apiRouter.post('/api/signup', _signupHandler);
   apiRouter.post('/api/orders', _createOrderHandler);
   apiRouter.post('/api/updateStatus', _updateStatusHandler);
+  apiRouter.get('/api/orders', _getOrdersHandler);
+  // ADDED: New endpoint to clear all orders.
+  apiRouter.post('/api/orders/clear', _clearOrdersHandler);
   
-  apiRouter.get('/api/orders', (Request request) {
-    final orders = _db.getAllOrders();
-    return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
-        headers: {'Content-Type': 'application/json'});
-  });
-
-  // CORRECTED: The function signature for the WebSocket handler now includes the optional protocol parameter.
   apiRouter.get('/ws', webSocketHandler((WebSocketChannel webSocket, String? protocol) {
     _clients.add(webSocket);
     print('WebSocket client connected. Total clients: ${_clients.length}');
@@ -47,7 +43,7 @@ void main() async {
   final dashboardPath = p.normalize(p.join(Directory.current.path, '..', 'dashboard'));
   final staticHandler = createStaticHandler(dashboardPath, defaultDocument: 'index.html');
 
-  final cascade = Cascade().add(staticHandler).add(apiRouter.call);
+  final cascade = Cascade().add(apiRouter.call).add(staticHandler);
 
   final server = await shelf_io.serve(
     const Pipeline().addMiddleware(logRequests()).addHandler(cascade.handler),
@@ -57,6 +53,21 @@ void main() async {
 
   print('Server running on http://${server.address.host}:${server.port}');
   print('Dashboard available at http://${server.address.host}:${server.port}');
+}
+
+// ADDED: Handler to clear all orders from the database.
+Future<Response> _clearOrdersHandler(Request request) async {
+  await _db.clearAllOrders();
+  // Inform all connected clients that the data has changed.
+  _broadcastToClients({'type': 'clear'});
+  print('All orders have been cleared.');
+  return Response.ok(jsonEncode({'message': 'All orders cleared successfully'}));
+}
+
+Future<Response> _getOrdersHandler(Request request) async {
+    final orders = _db.getAllOrders();
+    return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
+        headers: {'Content-Type': 'application/json'});
 }
 
 Future<Response> _loginHandler(Request request) async {
