@@ -1,4 +1,6 @@
-<img width="176" height="135" alt="image" src="https://github.com/user-attachments/assets/766def0c-237a-441a-a164-0dc4d42bd1de" />#  Toy Store System 
+<img width="1006" height="626" alt="image" src="https://github.com/user-attachments/assets/c2631c47-20a7-4bfc-85c0-a950944eb441" />
+
+#  Toy Store System 
   MEMBERS:
 JANNALYN CRUZ <br>
 JOHN MARWIN EBONA<br>
