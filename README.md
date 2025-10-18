@@ -37,7 +37,8 @@ A complete real-time LAN-connected ecosystem for toy store operations featuring 
                         └──────────────────┘
 ```
 ##app screenshot:
-![Uploading image.png…]()
+<img width="864" height="1920" alt="image" src="https://github.com/user-attachments/assets/aaaebc02-e2f7-4f40-9933-72c757056dc7" />
+
 
 
 ## Network Configuration
