@@ -1,7 +1,10 @@
+# Smart Toy Store - Full System Documentation
+
+
 <img width="1006" height="626" alt="image" src="https://github.com/user-attachments/assets/c2631c47-20a7-4bfc-85c0-a950944eb441" />
 
-#  Toy Store System 
-  MEMBERS:
+#  Toy Store System
+MEMBERS:
 JANNALYN CRUZ <br>
 JOHN MARWIN EBONA<br>
 PRINCE MARL LIZANDRELLE MIRASOL<br>
@@ -20,258 +23,128 @@ git push -u origin main
     
     taskkill /PID 26680 /F
     - kill task
-A complete real-time LAN-connected ecosystem for toy store operations featuring Flutter mobile app, Dart backend server, Arduino IoT integration, and HTML dashboard.
+## 1. System Architecture
 
-## System Architecture
+The system is a full-stack, real-time order processing and tracking application designed for a toy factory. It consists of four main components:
+
+1.  **Flutter Mobile App:** The customer-facing storefront. Users can browse a catalog of toys, register for an account, and place orders. It communicates with the backend server over the local network.
+
+2.  **Dart Backend Server:** The central hub of the entire system. It runs on a laptop and is responsible for:
+    *   Handling API requests (login, signup, order creation).
+    *   Maintaining a persistent JSON database for users and orders.
+    *   Serving the HTML dashboard to web clients.
+    *   Broadcasting real-time updates to all connected clients (Dashboard and Arduino) via WebSockets.
+
+3.  **HTML5 Dashboard:** The factory floor interface. It provides a real-time overview of all orders, including their status and assigned worker. It plays audio alerts for new orders.
+
+4.  **Arduino (ESP8266):** The physical interface for the factory floor. It connects to the WiFi network, receives order updates, and controls LEDs to signal new tasks. Workers use an RFID scanner connected to it to update the status of an order.
+
+### System Flow Diagram
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Flutter App    │── ─▶│  Shelf Backend   │◀───│   Arduino ESP   │
-│  (Mobile)       │     │  (WebSocket)     │     │  (RFID Reader)  │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌──────────────────┐
-                        │  HTML Dashboard  │
-                        │  (Web Browser)   │
-                        └──────────────────┘
-```
-##app screenshot:
-<img width="864" height="1920" alt="image" src="https://github.com/user-attachments/assets/aaaebc02-e2f7-4f40-9933-72c757056dc7" />
-
-
-
-## Network Configuration
-
-- **SSID:** db
-- **Password:** 123456789
-- **Backend IP:** 10.40.190.130
-- **Backend Port:** 8080
-- **WebSocket URL:** ws://10.40.190.130:8080/ws
-- **HTTP API:** http://10.40.190.130:8080
-
-## Components
-
-### 1. Flutter Mobile App (Android)
-- Material Design 3 UI
-- JWT Authentication
-- Real-time WebSocket updates
-- Offline caching with Hive
-- Order management and tracking
-- Android Embedding v2 compliant
-
-### 2. Dart Shelf Backend Server
-- RESTful API endpoints
-- WebSocket server for real-time communication
-- JWT authentication
-- JSON file-based storage
-- CORS enabled
-
-### 3. Arduino ESP8266/ESP32
-- WiFi connectivity
-- RFID UID processing
-- LED status indicators
-- Automatic status updates
-- HTTP client for backend communication
-
-### 4. HTML/JavaScript Dashboard
-- Real-time order monitoring
-- WebSocket client
-- Live statistics
-- Status animations
-- Responsive design
-
-## Getting Started
-
-### Prerequisites
-
-- Flutter SDK 3.x or higher
-- Dart SDK 3.0 or higher
-- Arduino IDE with ESP8266/ESP32 board support
-- WiFi hotspot named "db" with password "123456789"
-- Laptop/computer with IP 10.40.190.130
-
-### Backend Setup
-
-1. Navigate to backend directory:
-```bash
-cd backend
++-----------------+      +--------------------+      +-----------------+
+|USER'S Phone App |----->|  Laptop Backend    |<---->|  HTML Dashboard |
+| (Flutter)       |      |  (Dart Server)     |      |  (Web Browser)  |
++-----------------+      | - API (HTTP)       |      +-----------------+
+                         | - Real-time (WS)   |
+                         | - Database (JSON)  |
+                         +--------+-----------+
+                                  ^
+                                  |
+                       +----------+---------+
+                       |  Arduino (ESP8266) |
+                       | - Lights (LEDs)    |
+                       | - Scanner (RFID)   |
+                       +--------------------+
 ```
 
-2. Install dependencies:
-```bash
-dart pub get
-```
+---
 
-3. Run the server:
-```bash
-dart run bin/server.dart
-```
+## 2. Core Features
 
-The server will start on http://10.40.190.130:8080
+*   **Mobile-First Ordering:** A user-friendly mobile app for customers to browse and buy toys.
+*   **Real-Time Dashboard:** A live dashboard for factory managers to monitor all incoming orders.
+*   **Physical Task Signaling:** An Arduino-powered system with LEDs to provide clear, physical signals to factory workers.
+*   **RFID-Based Workflow:** Workers use an RFID scanner to update an order's status through the stages: `PROCESSING` -> `ON_THE_WAY` -> `DELIVERED`.
+*   **Persistent Storage:** Orders are saved to the server's disk and will survive a server restart.
+*   **Audio Alerts:** The dashboard plays a unique sound for each toy category when a new order arrives, alerting the relevant worker.
+*   **Hardcoded Worker Assignments:** Each order is automatically assigned to a specific factory worker based on the toy category.
+*   **Role-Specific UI:** The mobile app is for customers; the dashboard is for factory staff.
 
-### Flutter App Setup
+---
 
-1. Navigate to project root:
-```bash
-cd project
-```
+## 3. Setup and Operation Guide
 
-2. Install dependencies:
-```bash
-flutter pub get
-```
+Follow these steps to run the entire system.
 
-3. Generate Hive adapters:
-```bash
-flutter packages pub run build_runner build
-```
+### Step 1: Network Configuration
 
-4. Run the app:
-```bash
-flutter run
-```
+1.  **Create a WiFi Hotspot** on your laptop with the following settings:
+    *   **SSID:** `db`
+    *   **Password:** `123456789`
+2.  **Assign a Static IP Address** to your laptop's hotspot adapter.
+    *   The IP address **must** be `192.168.137.1`.
+    *   The Subnet Mask should be `255.255.255.0`.
 
-### Arduino Setup
+### Step 2: Backend Server Setup
 
-1. Open `arduino/smart_toy_rfid.ino` in Arduino IDE
+1.  Open a terminal and navigate to the `backend` directory:
+    ```sh
+    cd C:\Users\johnt\OneDrive\Desktop\app_dev_2\backend
+    ```
+2.  Install all required dependencies:
+    ```sh
+    dart pub get
+    ```
+3.  Run the server:
+    ```sh
+    dart run bin/server.dart
+    ```
+4.  The server should now be running. You will see the message: `Server running on http://0.0.0.0:8080`.
 
-2. Install required libraries:
-   - ESP8266WiFi (for ESP8266)
-   - ESP8266HTTPClient
-   - ArduinoJson
+> **Troubleshooting:** If you see an `address already in use` error, it means an old server process is stuck. Open the Task Manager, find any `dart.exe` processes, and end them.
 
-3. Select your board (ESP8266 or ESP32)
+### Step 3: Flutter App Setup (for JM's Phone)
 
-4. Upload the code to your device
+1.  **Prepare Assets:** Ensure the directory `assets/images/` exists in the root of the project. Place your toy images here (e.g., `toy_gun_1.png`).
+2.  **Install & Run:** Build and install the app on an Android phone connected to your laptop's hotspot (`db`).
+3.  **Functionality:**
+    *   Users can sign up without providing a department.
+    *   Users can browse the toy store, search for products, and place orders.
 
-5. Open Serial Monitor to see status and simulate RFID scans
+### Step 4: Arduino Setup
 
-### Dashboard Setup
+1.  Open the `arduino/smart_toy_rfid.ino` sketch in the Arduino IDE.
+2.  **Verify Configuration:** Ensure the `serverIP` is set to `192.168.137.1`.
+3.  **Upload the Sketch** to your ESP8266 device.
+4.  **LED Color Logic:**
+    *   `Dolls`: Green
+    *   `Puzzles`: Red
+    *   `Action Figures`: Yellow (Red + Green LEDs)
+    *   `Toy Guns`: Blue
 
-1. Open `dashboard/index.html` in a web browser
+### Step 5: Dashboard Access
 
-2. The dashboard will automatically connect to the WebSocket server
+1.  On any device connected to the hotspot (including your laptop or another phone), open a web browser.
+2.  Navigate to the server's URL:
+    ```
+    http://192.168.137.1:8080
+    ```
+3.  **Click the "Enable Sound & Enter" button.** This is a mandatory one-time step to comply with browser security policies.
+4.  The dashboard will load, display all persistent orders, and play sounds for new ones.
 
-## Usage
+---
 
-### Order Flow
+## 4. System Workflow
 
-1. **Create Order** (Mobile App):
-   - Login to the Flutter app
-   - Create a new order with RFID UID and category
+1.  **Order Placement:** A customer on the Flutter app buys a "Laser Ray Gun".
+2.  **Backend Processing:** The app sends the order to the backend. The backend assigns **John Marwin** to the order and saves it to `orders.json`.
+3.  **Real-Time Notifications:** The backend sends a WebSocket message to all clients.
+4.  **Dashboard Update:** The HTML dashboard receives the message, adds the "Laser Ray Gun" order to the table, and plays an mp3 for example: `lorem.mp3` sound.
+5.  **Arduino Action:** The Arduino is now aware an order for a "Toy Gun" exists.
+6.  **Factory Work:** a user  gets the toy. the person who was assign to the order scans the RFID tag for example (`TG01_UID`) on the Arduino scanner.
+7.  **Arduino Update:** The Arduino's **Blue LED turns on**. The Arduino sends a `POST` request to `/api/updateStatus` with the new status `PROCESSING`.
+8.  **Backend Update:** The backend updates the order in the database.
+9.  **Live Sync:** The backend broadcasts the status change. The dashboard and Flutter app update to show the order is now `PROCESSING`.
+10. **Completion:** This process repeats for `ON_THE_WAY` and `DELIVERED`. After the final scan, the Arduino's Blue LED turns off.
 
-2. **RFID Scan** (Arduino):
-   - Enter RFID UID in Serial Monitor
-   - Arduino sends status update to backend
-
-3. **Status Updates**:
-   - PENDING → PROCESSING (5 seconds)
-   - PROCESSING → ON_THE_WAY (5 seconds)
-   - ON_THE_WAY → DELIVERED (5 seconds)
-
-4. **Real-time Sync**:
-   - All devices receive updates via WebSocket
-   - Mobile app shows status with animations
-   - Dashboard displays live order table
-   - Arduino LEDs blink during transitions
-
-### RFID Mappings
-
-| RFID UID | Category        | LED Color |
-|----------|----------------|-----------|
-| A12B3C   | Toy Guns       | Red       |
-| D44F8Z   | Action Figures | Green     |
-| E77K9L   | Dolls          | Blue      |
-| F23M1N   | Puzzles        | Red       |
-| G56P2Q   | Board Games    | Green     |
-
-## API Endpoints
-
-### Authentication
-- `POST /login` - User login
-- `POST /signup` - User registration
-
-### Orders
-- `GET /orders` - Get all orders (requires auth)
-- `POST /orders` - Create new order (requires auth)
-- `POST /updateStatus` - Update order status (from Arduino)
-
-### WebSocket
-- `GET /ws` - WebSocket connection for real-time updates
-
-## Project Structure
-
-
-<img width="370" height="602" alt="image" src="https://github.com/user-attachments/assets/3ba6d783-5589-4f4b-b58a-f03c1fb6788f" />
-<img width="329" height="397" alt="image" src="https://github.com/user-attachments/assets/fe2578a6-5922-426b-8790-b37ba5e8e679" />
-
-
-
-## Features
-
-### Flutter App
-- JWT authentication with persistent login
-- Real-time order updates via WebSocket
-- Offline caching with Hive
-- Material Design 3 theming
-- Order status animations
-- Pull-to-refresh
-- Tab-based filtering
-
-### Backend
-- WebSocket broadcasting to all connected clients
-- JWT token generation and verification
-- File-based database persistence
-- CORS support for web clients
-- Request logging
-
-### Arduino
-- WiFi auto-reconnect
-- RFID mapping system
-- LED status indicators with blinking
-- Serial monitor for debugging
-- Automatic status progression
-
-### Dashboard
-- Real-time order monitoring
-- Connection status indicator
-- Live statistics (total, pending, processing, delivered, revenue)
-- Animated status badges
-- Responsive design
-
-## Troubleshooting
-
-### Backend Won't Start
-- Ensure IP address is correctly set to 10.40.190.130
-- Check if port 8080 is available
-- Verify WiFi connection to "db" network
-
-### Flutter App Can't Connect
-- Check WiFi connection on mobile device
-- Verify backend server is running
-- Ensure IP address matches in services
-
-### Arduino Not Connecting
-- Verify WiFi credentials in code
-- Check serial monitor for connection status
-- Ensure ESP8266/ESP32 board is properly selected
-
-### Dashboard Not Updating
-- Open browser console to check WebSocket connection
-- Verify backend server is running
-- Check if WebSocket URL is correct
-
-## Technologies Used
-
-- **Frontend:** Flutter 3.x, Dart
-- **Backend:** Dart, Shelf, WebSocket
-- **Database:** JSON file storage
-- **IoT:** Arduino, ESP8266/ESP32
-- **Web:** HTML5, JavaScript, WebSocket API
-- **Authentication:** JWT
-- **Real-time:** WebSocket protocol
-
-## License
-
-This project is part of the Smart Toy Store System ecosystem.
