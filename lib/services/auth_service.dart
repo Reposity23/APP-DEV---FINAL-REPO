@@ -5,7 +5,8 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../models/user.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://192.168.137.1:8080';
+  // Use a relative path for API calls, which is more robust.
+  static const String baseUrl = 'http://192.168.137.1:8080/api';
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
 

@@ -4,7 +4,8 @@ import 'package:hive/hive.dart';
 import '../models/order.dart';
 
 class OrderService {
-  static const String baseUrl = 'http://192.168.137.1:8080';
+  // Use a relative path for API calls, which is more robust.
+  static const String baseUrl = 'http://192.168.137.1:8080/api';
   static const String ordersBoxName = 'orders';
 
   Future<List<Order>> fetchOrders(String token) async {

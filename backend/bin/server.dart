@@ -21,24 +21,24 @@ void main() async {
   await _db.initialize();
   print('Database initialized');
 
-  final apiRouter = Router();
-  apiRouter.post('/login', _loginHandler);
-  apiRouter.post('/signup', _signupHandler);
-  apiRouter.post('/orders', _createOrderHandler);
-  apiRouter.post('/updateStatus', _updateStatusHandler);
+  // --- Main Router ---
+  final router = Router();
 
-  // CORRECTED: This handler now has NO authentication.
-  apiRouter.get('/orders', (Request request) {
-    try {
-      final orders = _db.getAllOrders();
-      return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
-          headers: {'Content-Type': 'application/json'});
-    } catch (e) {
-      return Response.internalServerError(body: 'Error fetching orders: $e');
-    }
+  // --- API Routes ---
+  router.post('/api/login', _loginHandler);
+  router.post('/api/signup', _signupHandler);
+  router.post('/api/orders', _createOrderHandler);
+  router.post('/api/updateStatus', _updateStatusHandler);
+  
+  // CORRECTED: This route has no authentication.
+  router.get('/api/orders', (Request request) {
+    final orders = _db.getAllOrders();
+    return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
+        headers: {'Content-Type': 'application/json'});
   });
 
-  apiRouter.get('/ws', webSocketHandler((WebSocketChannel webSocket, String? protocol) {
+  // --- WebSocket Route ---
+  router.get('/ws', webSocketHandler((WebSocketChannel webSocket) {
     _clients.add(webSocket);
     print('WebSocket client connected. Total clients: ${_clients.length}');
     webSocket.stream.listen((message) {},
@@ -48,27 +48,30 @@ void main() async {
     });
   }));
 
-  // CORRECTED: This handler serves the entire ../dashboard directory.
+  // --- Static File Handler ---
+  // CORRECTED: Serves the entire dashboard directory, including the 'sounds' subfolder.
   final staticHandler = createStaticHandler(
     p.join(Directory.current.path, '..', 'dashboard'),
     defaultDocument: 'index.html',
   );
 
-  // Combine handlers: First try API, then static files.
-  final cascade = Cascade().add(apiRouter.call).add(staticHandler);
+  // --- Final Handler ---
+  // ALL requests not matched by the router will fall through to the static handler.
+  final handler = const Pipeline()
+      .addMiddleware(logRequests())
+      .addHandler(router.call);
 
-  final server = await shelf_io.serve(
-    const Pipeline().addMiddleware(logRequests()).addHandler(cascade.handler),
-    '0.0.0.0',
-    8080,
-  );
+  final finalHandler = Cascade().add(handler).add(staticHandler).handler;
+
+  final server = await shelf_io.serve(finalHandler, '0.0.0.0', 8080);
 
   print('Server running on http://${server.address.host}:${server.port}');
-  print('Dashboard now available at http://${server.address.host}:${server.port}');
+  print('Dashboard available at http://${server.address.host}:${server.port}');
 }
 
 
-// --- Handlers (Login, Signup, etc. are unchanged) ---
+// --- Handlers (Login, Signup, etc.) ---
+// Note: These are simplified and should have proper error handling in a real app
 
 Future<Response> _loginHandler(Request request) async {
   final payload = await request.readAsString();
@@ -142,7 +145,7 @@ void _broadcastToClients(Map<String, dynamic> data) {
     try {
       client.sink.add(message);
     } catch (e) {
-      // Ignore errors for disconnected clients
+      // Ignore errors from disconnected clients
     }
   }
 }

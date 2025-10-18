@@ -15,18 +15,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedDepartment = 'Toy Guns';
   bool _obscurePassword = true;
-
-  final List<String> _departments = [
-    'Toy Guns',
-    'Action Figures',
-    'Dolls',
-    'Puzzles',
-    'Board Games',
-    'Remote Control',
-    'Educational',
-  ];
 
   @override
   void dispose() {
@@ -39,11 +28,14 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleSignup() async {
     if (_formKey.currentState!.validate()) {
       final provider = Provider.of<AppProvider>(context, listen: false);
+      // Assign a default department for customers
+      const defaultDepartment = 'General';
+      
       final success = await provider.signup(
         _usernameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
-        _selectedDepartment,
+        defaultDepartment,
       );
 
       if (success && mounted) {
@@ -120,28 +112,6 @@ class _SignupScreenState extends State<SignupScreen> {
                         return 'Please enter a valid email';
                       }
                       return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedDepartment,
-                    decoration: InputDecoration(
-                      labelText: 'Department',
-                      prefixIcon: const Icon(Icons.business),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    items: _departments.map((dept) {
-                      return DropdownMenuItem(
-                        value: dept,
-                        child: Text(dept),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedDepartment = value!;
-                      });
                     },
                   ),
                   const SizedBox(height: 16),
