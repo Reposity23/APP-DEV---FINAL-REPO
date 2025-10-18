@@ -36,6 +36,9 @@ A complete real-time LAN-connected ecosystem for toy store operations featuring 
                         │  (Web Browser)   │
                         └──────────────────┘
 ```
+##app screenshot:
+![Uploading image.png…]()
+
 
 ## Network Configuration
 
