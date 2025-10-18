@@ -21,67 +21,54 @@ void main() async {
   await _db.initialize();
   print('Database initialized');
 
-  // --- API Router for backend logic ---
   final apiRouter = Router();
   apiRouter.post('/login', _loginHandler);
   apiRouter.post('/signup', _signupHandler);
   apiRouter.post('/orders', _createOrderHandler);
   apiRouter.post('/updateStatus', _updateStatusHandler);
-  
-  // FIX: Removed authentication from the GET /orders route
+
+  // CORRECTED: This handler now has NO authentication.
   apiRouter.get('/orders', (Request request) {
-    final orders = _db.getAllOrders();
-    return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
-        headers: {'Content-Type': 'application/json'});
+    try {
+      final orders = _db.getAllOrders();
+      return Response.ok(jsonEncode(orders.map((o) => o.toJson()).toList()),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      return Response.internalServerError(body: 'Error fetching orders: $e');
+    }
   });
 
   apiRouter.get('/ws', webSocketHandler((WebSocketChannel webSocket, String? protocol) {
     _clients.add(webSocket);
     print('WebSocket client connected. Total clients: ${_clients.length}');
-    webSocket.stream.listen((message) {
-      // This is a simple echo server for now
-      // In a real app, you would handle messages from the client here
-    }, onDone: () {
+    webSocket.stream.listen((message) {},
+     onDone: () {
       _clients.remove(webSocket);
       print('WebSocket client disconnected. Total clients: ${_clients.length}');
     });
   }));
 
-  // --- Static File Handler for the Dashboard ---
-  // FIX: Correctly configure the path to the 'dashboard' directory.
-  final dashboardPath = p.normalize(p.join(Directory.current.path, '..', 'dashboard'));
-  final staticHandler = createStaticHandler(dashboardPath, defaultDocument: 'index.html');
+  // CORRECTED: This handler serves the entire ../dashboard directory.
+  final staticHandler = createStaticHandler(
+    p.join(Directory.current.path, '..', 'dashboard'),
+    defaultDocument: 'index.html',
+  );
 
-  // --- Main Handler combining API and static files ---
-  final cascade = Cascade().add(staticHandler).add(apiRouter);
+  // Combine handlers: First try API, then static files.
+  final cascade = Cascade().add(apiRouter.call).add(staticHandler);
 
-  final handler = const Pipeline()
-      .addMiddleware(_corsMiddleware)
-      .addMiddleware(logRequests())
-      .addHandler(cascade.handler);
-
-  final server = await shelf_io.serve(handler, '0.0.0.0', 8080);
+  final server = await shelf_io.serve(
+    const Pipeline().addMiddleware(logRequests()).addHandler(cascade.handler),
+    '0.0.0.0',
+    8080,
+  );
 
   print('Server running on http://${server.address.host}:${server.port}');
-  print('Dashboard available at http://${server.address.host}:${server.port}');
+  print('Dashboard now available at http://${server.address.host}:${server.port}');
 }
 
-// --- Middleware & Handlers ---
 
-final _corsMiddleware = createMiddleware(requestHandler: (Request request) {
-  if (request.method == 'OPTIONS') {
-    return Response.ok('', headers: _corsHeaders);
-  }
-  return null;
-}, responseHandler: (Response response) {
-  return response.change(headers: _corsHeaders);
-});
-
-const _corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-control-allow-headers': 'origin, content-type, accept, authorization',
-};
+// --- Handlers (Login, Signup, etc. are unchanged) ---
 
 Future<Response> _loginHandler(Request request) async {
   final payload = await request.readAsString();
@@ -152,6 +139,10 @@ Future<Response> _updateStatusHandler(Request request) async {
 void _broadcastToClients(Map<String, dynamic> data) {
   final message = jsonEncode(data);
   for (final client in _clients) {
-    client.sink.add(message);
+    try {
+      client.sink.add(message);
+    } catch (e) {
+      // Ignore errors for disconnected clients
+    }
   }
 }
