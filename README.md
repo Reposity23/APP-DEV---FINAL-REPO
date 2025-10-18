@@ -1,4 +1,4 @@
-#  Toy Store System 
+<img width="176" height="135" alt="image" src="https://github.com/user-attachments/assets/766def0c-237a-441a-a164-0dc4d42bd1de" />#  Toy Store System 
   MEMBERS:
 JANNALYN CRUZ <br>
 JOHN MARWIN EBONA<br>
@@ -196,50 +196,11 @@ flutter run
 
 ## Project Structure
 
-```
-project/
-├── lib/
-│   ├── main.dart
-│   ├── models/
-│   │   ├── user.dart
-│   │   ├── toy.dart
-│   │   └── order.dart
-│   ├── services/
-│   │   ├── auth_service.dart
-│   │   ├── websocket_service.dart
-│   │   └── order_service.dart
-│   ├── providers/
-│   │   └── app_provider.dart
-│   ├── screens/
-│   │   ├── login_screen.dart
-│   │   ├── signup_screen.dart
-│   │   └── home_screen.dart
-│   └── widgets/
-│       └── order_card.dart
-├── android/
-│   ├── app/
-│   │   ├── build.gradle
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml
-│   │       └── kotlin/com/example/smarttoystore/
-│   │           └── MainActivity.kt
-│   ├── build.gradle
-│   ├── settings.gradle
-│   └── gradle.properties
-├── backend/
-│   ├── bin/
-│   │   └── server.dart
-│   ├── lib/
-│   │   ├── models.dart
-│   │   ├── database.dart
-│   │   └── auth.dart
-│   └── pubspec.yaml
-├── arduino/
-│   └── smart_toy_rfid.ino
-├── dashboard/
-│   └── index.html
-└── pubspec.yaml
-```
+
+<img width="370" height="602" alt="image" src="https://github.com/user-attachments/assets/3ba6d783-5589-4f4b-b58a-f03c1fb6788f" />
+<img width="329" height="397" alt="image" src="https://github.com/user-attachments/assets/fe2578a6-5922-426b-8790-b37ba5e8e679" />
+
+
 
 ## Features
 
