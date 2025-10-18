@@ -18,12 +18,24 @@ struct RFIDMapping {
   int ledPin;
 };
 
+// --- NEW RFID MAPPING ---
 RFIDMapping rfidMappings[] = {
-  {"A12B3C", "Toy Guns", LED_RED},
-  {"D44F8Z", "Action Figures", LED_GREEN},
-  {"E77K9L", "Dolls", LED_BLUE},
-  {"F23M1N", "Puzzles", LED_RED},
-  {"G56P2Q", "Board Games", LED_GREEN},
+  // Toy Guns (Red LED)
+  {"TG01_UID", "Toy Guns", LED_RED},
+  {"TG02_UID", "Toy Guns", LED_RED},
+  {"TG03_UID", "Toy Guns", LED_RED},
+  // Action Figures (Green LED)
+  {"AF01_UID", "Action Figures", LED_GREEN},
+  {"AF02_UID", "Action Figures", LED_GREEN},
+  {"AF03_UID", "Action Figures", LED_GREEN},
+  // Dolls (Blue LED)
+  {"DL01_UID", "Dolls", LED_BLUE},
+  {"DL02_UID", "Dolls", LED_BLUE},
+  {"DL03_UID", "Dolls", LED_BLUE},
+  // Puzzles (Red + Blue -> Purple LED)
+  {"PZ01_UID", "Puzzles", LED_RED},
+  {"PZ02_UID", "Puzzles", LED_RED},
+  {"PZ03_UID", "Puzzles", LED_RED},
 };
 
 const int numMappings = sizeof(rfidMappings) / sizeof(RFIDMapping);
@@ -91,7 +103,6 @@ void loop() {
     }
   }
   
-  // The LED status should still be updated continuously
   updateLEDStatus();
 }
 
@@ -106,7 +117,6 @@ void processRFIDScan(String rfidUID) {
       currentCategory = rfidMappings[i].category;
       currentLedPin = rfidMappings[i].ledPin;
       
-      // Determine the next status based on the current one
       if (currentStatus == "PENDING") {
         currentStatus = "PROCESSING";
       } else if (currentStatus == "PROCESSING") {
@@ -114,7 +124,6 @@ void processRFIDScan(String rfidUID) {
       } else if (currentStatus == "ON_THE_WAY") {
         currentStatus = "DELIVERED";
       } else {
-        // If the order is already delivered, do nothing until it is cleared
         return; 
       }
 
@@ -171,9 +180,8 @@ void sendStatusUpdate() {
       Serial.println(response);
       Serial.println("Status update successful!");
       
-      // If the order is delivered, reset the state after a delay
       if (currentStatus == "DELIVERED") {
-        delay(5000); // Keep the DELIVERED status for 5 seconds
+        delay(5000); 
         currentRFID = "";
         currentCategory = "";
         currentLedPin = -1;
@@ -197,17 +205,27 @@ void updateLEDStatus() {
     return;
   }
 
-  if (currentStatus == "PROCESSING" || currentStatus == "ON_THE_WAY") {
-    static unsigned long lastBlink = 0;
-    static bool ledState = false;
-
-    if (millis() - lastBlink >= 250) {
-      ledState = !ledState;
-      digitalWrite(currentLedPin, ledState ? HIGH : LOW);
-      lastBlink = millis();
+  if (currentCategory == "Puzzles") { // Special case for Puzzles (Purple LED)
+    if (currentStatus == "PROCESSING" || currentStatus == "ON_THE_WAY") {
+        digitalWrite(LED_RED, HIGH);
+        digitalWrite(LED_BLUE, HIGH);
+    } else if (currentStatus == "DELIVERED") {
+        digitalWrite(LED_RED, HIGH);
+        digitalWrite(LED_BLUE, HIGH);
     }
-  } else if (currentStatus == "DELIVERED") {
-    digitalWrite(currentLedPin, HIGH);
+  } else { // For other categories
+    if (currentStatus == "PROCESSING" || currentStatus == "ON_THE_WAY") {
+      static unsigned long lastBlink = 0;
+      static bool ledState = false;
+
+      if (millis() - lastBlink >= 250) {
+        ledState = !ledState;
+        digitalWrite(currentLedPin, ledState ? HIGH : LOW);
+        lastBlink = millis();
+      }
+    } else if (currentStatus == "DELIVERED") {
+      digitalWrite(currentLedPin, HIGH);
+    }
   }
 }
 

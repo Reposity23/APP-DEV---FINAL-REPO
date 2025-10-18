@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'models/order.dart';
+import 'models/user.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -8,7 +10,10 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Hive and register adapters
   await Hive.initFlutter();
+  Hive.registerAdapter(UserAdapter());
+  Hive.registerAdapter(OrderAdapter());
 
   runApp(const MyApp());
 }
