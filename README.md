@@ -54,7 +54,7 @@ This project provides significant value by creating a tangible, working model fo
 
 *   **For the Institution and Future Students:** This project serves as a comprehensive, practical case study in full-stack development and the Internet of Things. It demonstrates how disparate technologies (mobile, web, backend, and embedded systems) can be integrated into a single, cohesive product. It provides a valuable blueprint for future projects in automation, logistics, and real-time systems.
 
-In essence, this project makes a positive impact by improving efficiency, reducing errors, and enhancing communication within a manufacturing environment, proving that powerful, custom-built IoT solutions are within reach.
+
 
 <img width="1006" height="626" alt="image" src="https://github.com/user-attachments/assets/c2631c47-20a7-4bfc-85c0-a950944eb441" />
 
